@@ -6,6 +6,7 @@ import select
 import termios
 import tty
 from threading import Thread
+from pathlib import Path
 
 from streaming.asr import ASRStreamer
 from streaming.mic import AudioStreamManager
@@ -46,6 +47,9 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     #tcp_server_port = 27400
     #verbose = False
 
+    project_path = Path(__file__).resolve(strict=True).parent
+    
+
     # Initialize components
     asr_streamer = ASRStreamer(
         model_name, 
@@ -61,6 +65,7 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
         asr_streamer=asr_streamer,
         transcription_server=server,
         silence_threshold=silence_threshold,
+        project_path=project_path,
         verbose=verbose
     )
 

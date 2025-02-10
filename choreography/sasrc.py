@@ -7,6 +7,7 @@ import sys
 import numpy as np
 from threading import Event, Thread
 import wave
+from pathlib import Path
 
 from communication.server import TranscriptionServer
 from communication.rc import RemoteControl
@@ -19,13 +20,14 @@ class ASRChoreographer:
     for managing user interaction.
 
     """
-    def __init__(self, asr_streamer, transcription_server, silence_threshold=5.0, verbose=True):
+    def __init__(self, asr_streamer, transcription_server, silence_threshold=5.0, project_path=".", verbose=True):
         self.asr_streamer = asr_streamer
         self.transcription_server = transcription_server
         self.silence_threshold = silence_threshold  # seconds
         self.last_activity_time = time.time()
         self.is_active = False
         self.silence_check_enabled = True
+        self.project_path = project_path
         self.verbose = verbose
 
         # handling of Ctrl-C
@@ -131,7 +133,7 @@ class ASRChoreographer:
 
     def _init_silence_waveform(self):
         # load dummy wave file (need not be silence)
-        with wave.open("assets/ui_sound_effects/beep-open.wav", 'rb') as wf:
+        with wave.open(str(self.project_path.joinpath("assets/ui_sound_effects/beep-open.wav")), 'rb') as wf:
             data = wf.readframes(1000000) # the whole wave file
             # reduce volume to near zero in waveform
             data_readonly = np.frombuffer(data, dtype=np.int16).reshape(-1, wf.getnchannels())
@@ -145,8 +147,8 @@ class ASRChoreographer:
 
     def _init_toggling_waveforms(self):
         # load sounds from wave files
-        wf_activate = wave.open("assets/ui_sound_effects/beep-open.wav", 'rb')
-        wf_deactivate = wave.open("assets/ui_sound_effects/beep-close.wav", 'rb')
+        wf_activate = wave.open(str(self.project_path.joinpath("assets/ui_sound_effects/beep-open.wav")), 'rb')
+        wf_deactivate = wave.open(str(self.project_path.joinpath("assets/ui_sound_effects/beep-close.wav")), 'rb')
         data = wf_activate.readframes(1000000) # the whole wave file
         self._activate_audio_data = np.frombuffer(data, dtype=np.int16).reshape(-1, wf_activate.getnchannels())
         data = wf_deactivate.readframes(1000000)
