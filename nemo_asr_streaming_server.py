@@ -23,14 +23,14 @@ def run_remote_control(remote_control):
     remote_control.run()
 
 @click.command()
-@click.option('--tcp_server_port', default=27400, help='The port over which to serve TCP messages, e.g., 27499')
+@click.option('--tcp_server_port', default=27400, help='The port over which to serve TCP messages, e.g., 27400')
 @click.option('--lookahead', type=click.Choice(['0', '80', '480', '1040']), default='80', help='Lookahead size for streaming ASR in ms')
 @click.option('--decoder_type', type=click.Choice(['rnnt']), default='rnnt') #, 'ctc'])
 @click.option('--decoding_strategy', type=click.Choice(['greedy', 'beam']), default='greedy')
-@click.option('--rc_udp_host', default='127.0.0.1', help='The address of the remote-control UDP host, e.g., localhost')
+@click.option('--rc_udp_host', default='0.0.0.0', help='The address (e.g., 0.0.0.0) over which to listen to UDP packets sent from the Remote-Control')
 @click.option('--rc_udp_port', default=5656, help='The port of the remote-control UDP host')
 @click.option('--toggle_button_control', is_flag=True, help='Initialize control mode to: button press turns on and off ASR, as opposed to the default press-and-hold-to-talk controls')
-@click.option('--verbose', is_flag=True, help='Show debug info and warnings on the terminal')
+@click.option('--verbose', '-v', is_flag=True, help='Show debug info and warnings on the terminal')
 def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_host, rc_udp_port, toggle_button_control, verbose):
     # Model configuration
     model_name = "stt_en_fastconformer_hybrid_large_streaming_multi"
