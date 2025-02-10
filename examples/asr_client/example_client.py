@@ -13,9 +13,10 @@ def main():
         s.connect((host, port))
         while True:
             data = s.recv(1024)
-            if not data:
-                break
-            print(f"Received: {data.decode('utf-8')}")
+            decoded_data = ""
+            if data:
+                decoded_data = data.decode('utf-8')
+            print(f"Received: {decoded_data}")
 
 if __name__ == "__main__":
     main()
