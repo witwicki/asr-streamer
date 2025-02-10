@@ -86,7 +86,7 @@ class RemoteControl:
                     time.sleep(0.01)
                     
         except socket.error as e:
-            print(f"Socket error occurred: {e}")
+            print(f"RemoteControl: Socket error occurred: {e}")
         finally:
             # Close the socket
             sock.close()
