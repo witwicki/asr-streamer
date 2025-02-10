@@ -55,7 +55,7 @@ class ASRChoreographer:
             self.deactivate_asr()
 
     def send_latest_asr_result(self):
-        self.transcription_server.send_transcription(self.asr_streamer.buffer)
+        self.transcription_server.send_transcription(f"[{self.asr_streamer.buffer}]")
 
 
     def activate_asr(self):
