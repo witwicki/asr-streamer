@@ -1,4 +1,4 @@
-""" streaming ASR choreographer """
+""" Streaming ASR Choreographer """
 
 
 import signal
@@ -24,9 +24,13 @@ class ASRChoreographer:
         self.asr_streamer = asr_streamer
         self.transcription_server = transcription_server
         self.silence_threshold = silence_threshold  # seconds
-        self.last_activity_time = time.time()
+        self.waiting_for_silence_to_deactivate = False
+        current_time = time.time()
+        self.last_activity_time = current_time
+        self.time_of_last_asr_result = current_time
+        self.time_consumed_by_asr_processing = None
+        self.time_since_last_asr_result = None
         self.is_active = False
-        self.silence_check_enabled = True
         self.project_path = project_path
         self.verbose = verbose
 
@@ -52,7 +56,11 @@ class ASRChoreographer:
         if not self.is_active:
             self.activate_asr()
         else:
-            self.deactivate_asr()
+            self.play_deactivate_sound()
+            self.waiting_for_silence_to_deactivate = True
+            if self.verbose:
+                print(f"*** ASR Deactivation process started. Waiting for {self.silence_threshold} seconds of silence before cutting transcription. ***")
+            #self.deactivate_asr()
 
     def send_latest_asr_result(self):
         self.transcription_server.send_transcription(f"[{self.asr_streamer.buffer}]")
@@ -71,44 +79,60 @@ class ASRChoreographer:
     def deactivate_asr(self):
         """Deactivate the ASR streamer and send any buffered transcription."""
         if self.is_active:
-            print("\nDEACTIVATING ASR...")
-            self.play_deactivate_sound()
+            print(f"\n...SENDING LATEST RESULT: [{self.asr_streamer.buffer}]")
             self.send_latest_asr_result()
             self.asr_streamer.reset_streaming_state()
             self.is_active = False
             # TODO Stop silence monitoring thread if running
     
     def recognize_speech(self, in_data, frame_count, time_info, status):
-            # profile the runtime of this method
-            start_time = time.time()
             # TODO accumulate a THRESHOLD-seconds buffer of speech recognition results
             if self.is_active:
+                start_time = time.time() # profile the runtime of this method, and track time in between results
                 signal = np.frombuffer(in_data, dtype=np.int16)
                 text = self.asr_streamer.process_chunk(signal)
-                print(f"[{text}]") #, end='\r')
-                # was new speech detected?
-                if (text != self.asr_streamer.buffer):
-                    self.update_last_activity()
-                self.asr_streamer.buffer = text
-            # profile the runtime of this method
-            if self.verbose: 
-                print("Time taken for recognize_speech: {:.2f} seconds".format(time.time() - start_time))
+                self.time_consumed_by_asr_processing = (time.time() - start_time)
+                self.time_since_last_asr_result = (time.time() - self.time_of_last_asr_result)
+                self.time_of_last_asr_result = time.time()
+                if self.verbose:
+                    print(f"ASR_result: [{text}]") #, end='\r')
+                    print("time taken for recognize_speech: {:.2f}s, ".format(self.time_consumed_by_asr_processing), end="")
+                    print("time since last activity: {:.2f}s, ".format(self.time_since_last_speech_activity_detected()), end="")
+                    print("time since last asr_result: {:.2f}s, ".format(self.time_since_last_asr_result), end="")
+                    print("effective detected silence: {:.2f}s".format(self.time_since_last_speech_activity_detected() - self.time_since_last_asr_result))
+
+                # was no new speech detected?
+                if text == self.asr_streamer.buffer:
+                    # has enough silence passed that we should consider terminating asr?
+                    self.check_silence()
+                else:
+                    if not self.verbose: # otherwise we would have already printed it above
+                        print(f"ASR_result: [{text}]") #, end='\r')
+                    self.asr_streamer.buffer = text
+                    self.update_last_activity()                        
+
             return (in_data, self.pyaudio.paContinue)
+
+
+    def time_since_last_speech_activity_detected(self):
+        current_time = time.time()
+        return (current_time - self.last_activity_time)
 
     def check_silence(self):
         """Check if no speech has been detected for the threshold duration."""
         if self.is_active:
-            current_time = time.time()
-            print(f"silent for {current_time - self.last_activity_time} seconds")
-            if (current_time - self.last_activity_time) >= self.silence_threshold:
-                print(f"\nAutomatically deactivating ASR due to silence.")
-                self.deactivate_asr()
+            if (self.time_since_last_speech_activity_detected() - self.time_since_last_asr_result) > self.silence_threshold:
+                if self.waiting_for_silence_to_deactivate:
+                    if self.verbose:
+                        print(f"\nAutomatically deactivating ASR due to silence.")
+                    self.deactivate_asr()
+                    self.waiting_for_silence_to_deactivate = False # state reset
                 return True
         return False
 
     def update_last_activity(self):
         """Update the last activity timestamp when speech is detected."""
-        if self.is_active and self.silence_check_enabled:
+        if self.is_active:
             self.last_activity_time = time.time()
 
     def _force_exit_handler(self, sig, frame):
@@ -138,7 +162,7 @@ class ASRChoreographer:
             # reduce volume to near zero in waveform
             data_readonly = np.frombuffer(data, dtype=np.int16).reshape(-1, wf.getnchannels())
             self._silence_audio_data = np.copy(data_readonly)
-            np.multiply(self._silence_audio_data, 0.0003, out=self._silence_audio_data, casting="unsafe")
+            np.multiply(self._silence_audio_data, 0.0002, out=self._silence_audio_data, casting="unsafe")
             # start a stream and close file
             self._background_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf.getsampwidth()),  
                 channels = wf.getnchannels(),  

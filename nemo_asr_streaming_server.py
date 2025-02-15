@@ -37,7 +37,7 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     lookahead_size = int(lookahead)
     #decoder_type = "rnnt"
     #decoding_strategy = "greedy" # "beam"
-    silence_threshold = 30.0  # seconds
+    silence_threshold = 0.5  # seconds
     #udp_host = "127.0.0.1"
     #udp_port = 5656
     if(toggle_button_control):
@@ -92,10 +92,11 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
             if select.select([sys.stdin], [], [], 0)[0]:
                 key = sys.stdin.read(1)
                 if key == 's':
-                    if asr_choreographer.is_active:
-                        asr_choreographer.deactivate_asr()
-                    else:
-                        asr_choreographer.activate_asr()
+                    asr_choreographer.toggle_asr()
+                    #if asr_choreographer.is_active:
+                    #    asr_choreographer.deactivate_asr()
+                    #else:
+                    #    asr_choreographer.activate_asr()
                 elif key == 'm':
                     remote_control_interface.switch_mode()
                 elif key == 'z':
