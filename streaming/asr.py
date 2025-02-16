@@ -33,6 +33,7 @@ class ASRStreamer:
         self._init_model()
         self._init_streaming_state()
         self._warm_up_model()
+        self.buffer = "" # the buffer of recognized text
         print("...done initializing ASR model.")
 
     @streaming.show_terminal_output
@@ -107,7 +108,6 @@ class ASRStreamer:
         self.cache_pre_encode = torch.zeros(
             (1, num_channels, self.pre_encode_cache_size), device=self.device
         )
-        self.buffer = "" # the buffer of recognized text
     
     def reset_streaming_state(self):
         self._init_streaming_state()

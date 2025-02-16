@@ -37,7 +37,8 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     lookahead_size = int(lookahead)
     #decoder_type = "rnnt"
     #decoding_strategy = "greedy" # "beam"
-    silence_threshold = 0.5  # seconds
+    streaming_result_delay_silence_threshold = 0.5 # seconds
+    silence_threshold = 1.0 # seconds
     #udp_host = "127.0.0.1"
     #udp_port = 5656
     if(toggle_button_control):
@@ -64,6 +65,7 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     asr_choreographer = ASRChoreographer(
         asr_streamer=asr_streamer,
         transcription_server=server,
+        streaming_result_delay_silence_threshold=streaming_result_delay_silence_threshold,
         silence_threshold=silence_threshold,
         project_path=project_path,
         verbose=verbose
@@ -93,10 +95,6 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
                 key = sys.stdin.read(1)
                 if key == 's':
                     asr_choreographer.toggle_asr()
-                    #if asr_choreographer.is_active:
-                    #    asr_choreographer.deactivate_asr()
-                    #else:
-                    #    asr_choreographer.activate_asr()
                 elif key == 'm':
                     remote_control_interface.switch_mode()
                 elif key == 'z':
