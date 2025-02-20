@@ -71,9 +71,11 @@ class RemoteControl:
                             self.asr_choreographer.toggle_asr()
                     elif self.mode == "press_and_hold_to_talk":
                         if self.current_state == False and new_control_state == True:
-                            self.asr_choreographer.activate_asr()
+                            if not self.asr_choreographer.is_active:
+                                self.asr_choreographer.toggle_asr()
                         elif self.current_state == True and new_control_state == False:
-                            self.asr_choreographer.deactivate_asr()
+                            if self.asr_choreographer.is_active:
+                                self.asr_choreographer.toggle_asr()
                         
                     # Update previous boolean state for next iteration
                     self.current_state = new_control_state

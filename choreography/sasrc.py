@@ -54,7 +54,7 @@ class ASRChoreographer:
     def toggle_asr(self):
         if not self.is_active:
             self.set_asr_state(active=True)
-        else:
+        elif not self.waiting_for_silence_to_deactivate:
             self.play_deactivate_sound()
             self.waiting_for_silence_to_deactivate = True
             if self.verbose:
