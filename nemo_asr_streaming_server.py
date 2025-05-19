@@ -37,7 +37,7 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     lookahead_size = int(lookahead)
     #decoder_type = "rnnt"
     #decoding_strategy = "greedy" # "beam"
-    streaming_result_delay_silence_threshold = 1.5 # seconds
+    streaming_result_delay_silence_threshold = 0.5 # seconds
     silence_threshold = 0.5 # seconds
     #udp_host = "127.0.0.1"
     #udp_port = 5656
