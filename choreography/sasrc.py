@@ -77,11 +77,11 @@ class ASRChoreographer:
             if self.is_active:
                 print("DEACTIVATING ASR")
             self.is_active = False
-            # a reset is really only necessary when the buffer contains recognized speech
-            if self.asr_streamer.buffer:
-                self.asr_streamer.reset_streaming_state()
         else:
             print("Warning: set_asr_state(active=True) called when ASR is already active. Ignoring.")
+        # a reset is really only necessary when the buffer contains recognized speech
+        if self.asr_streamer.buffer:
+            self.asr_streamer.reset_streaming_state()
 
     def send_latest_asr_result(self):
         print(f"SENDING LATEST RESULT: [{self.asr_streamer.buffer}]")
