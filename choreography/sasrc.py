@@ -34,13 +34,15 @@ class ASRChoreographer:
         self.is_active = False # active vs. passive (where ASR is still processing, just not sending the results)
         self.project_path = project_path
         self.verbose = verbose
+        self.init_time = time.time()
 
         # handling of Ctrl-C
         self._exit_event = Event()
         signal.signal(signal.SIGINT, self._force_exit_handler)
 
-        # basic state variable
+        # state variables
         self.was_killed = False
+        self.frames_processed = 0
 
     def setup_audio_output(self, pyaudio_package, pyaudio_object):
         self.pyaudio = pyaudio_package
@@ -53,8 +55,12 @@ class ASRChoreographer:
 
     def toggle_asr(self):
         if not self.is_active:
+            if self.verbose:
+                print(f"ON {time.time()-self.init_time}")
             self.set_asr_state(active=True)
         elif not self.waiting_for_silence_to_deactivate:
+            if self.verbose:
+                print(f"OFF {time.time()-self.init_time}")
             self.play_deactivate_sound()
             self.waiting_for_silence_to_deactivate = True
             if self.verbose:
@@ -83,11 +89,20 @@ class ASRChoreographer:
 
     def recognize_speech(self, in_data, frame_count, time_info, status):
             start_time = time.time() # profile the runtime of this method, and track time in between results
+            t_chunk_start = self.frames_processed / ASRStreamer.SAMPLE_RATE 
+            self.frames_processed += frame_count
+            t_chunk_end = self.frames_processed / ASRStreamer.SAMPLE_RATE
             signal = np.frombuffer(in_data, dtype=np.int16)
             text = self.asr_streamer.process_chunk(signal)
             self.time_consumed_by_asr_processing = (time.time() - start_time)
             self.time_since_last_asr_result = (time.time() - self.time_of_last_asr_result)
             self.time_of_last_asr_result = time.time()
+            if self.verbose:
+                print(
+                    f"/ wall={start_time-self.init_time}, mic=[{t_chunk_start}, {t_chunk_end}]"
+                    f", offset={t_chunk_end-(start_time-self.init_time)}, compute_time={self.time_since_last_asr_result}/"
+                )
+
             if self.verbose:
                 print(f"ASR_result: [{text}]") #, end='\r')
                 print(f"  previous was {self.asr_streamer.buffer}")
