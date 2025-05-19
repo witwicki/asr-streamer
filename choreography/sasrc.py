@@ -126,7 +126,7 @@ class ASRChoreographer:
         """Check if no speech has been detected for the threshold duration."""
         if self.verbose:
             print(f"ASRChoreographer.deactivate_if_silence_threshold_exceeded({threshold})")
-        if (self.time_since_last_speech_activity_detected() - self.time_since_last_asr_result) > threshold:
+        if (self.time_since_last_speech_activity_detected() - self.time_since_last_asr_result) >= threshold:
             if self.verbose:
                 print(f"\nAutomatically deactivating ASR due to silence.")
             self.set_asr_state(active=False)
