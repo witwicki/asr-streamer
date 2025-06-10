@@ -35,6 +35,9 @@ class ASRChoreographer:
         self.project_path = project_path
         self.verbose = verbose
         self.init_time = time.time()
+        self.active_start_time = 0.0
+        self.active_finish_time = 0.0
+        self.MINIMUM_ACTIVE_DURATION = 1.0 # seconds
 
         # handling of Ctrl-C
         self._exit_event = Event()
@@ -54,14 +57,17 @@ class ASRChoreographer:
         self._init_toggling_waveforms()
 
     def toggle_asr(self):
+        # TODO shouldn't the elif condition go here instead?
         if not self.is_active:
             if self.verbose:
                 print(f"ON {time.time()-self.init_time}")
             self.set_asr_state(active=True)
+            self.active_start_time = time.time()
         elif not self.waiting_for_silence_to_deactivate:
             if self.verbose:
                 print(f"OFF {time.time()-self.init_time}")
-            self.play_deactivate_sound()
+            self.active_finish_time = time.time()
+            self.play_deactivate_sound() # TODO: this looks like it might not make a sound
             self.waiting_for_silence_to_deactivate = True
             if self.verbose:
                 print(f"*** ASR Deactivation process started. Waiting for {self.streaming_result_delay_silence_threshold} seconds of silence before cutting transcription. ***")
@@ -117,7 +123,8 @@ class ASRChoreographer:
                     if self.waiting_for_silence_to_deactivate:
                         # in this case we are just looking for any late asr results followed by silence...
                         if self.deactivate_if_silence_threshold_exceeded(self.streaming_result_delay_silence_threshold):
-                            self.send_latest_asr_result()
+                            if (self.active_finish_time - self.active_start_time) > self.MINIMUM_ACTIVE_DURATION:
+                                self.send_latest_asr_result()
                 else:
                     # ...whereas here we are looking for natural gaps in between utterances
                     #      that serve to seed our next active asr session with an appropriate beginning
