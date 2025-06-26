@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+  {name = "Stefan Witwicki", email = "witwicki@gmail.com"},
+]
+name = "asr-streamer"
+version = "0.1.0"
+readme = "README.md"
+requires-python = "==3.10.*"
+dependencies = [
+    "click",
+    "cython",
+    "huggingface-hub==0.23.2",
+    "nemo-toolkit[asr] ; sys_platform == 'linux'",
+    "nemo-toolkit[asr]==2.0.0rc0 ; sys_platform == 'darwin'",
+    "numpy",
+    "omegaconf",
+    "packaging",
+    "pyaudio",
+    "torch",
+    "torch==2.5.1 ; platform_machine=='aarch64'",
+    "torchaudio",
+    "torchaudio==2.5.1 ; platform_machine=='aarch64'",
+    "wheel",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu124", marker = "platform_machine=='aarch64'" },
+]
+torchaudio = [
+    { index = "torchaudio-cu124", marker = "platform_machine=='aarch64'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
+name = "torchaudio-cu124"
+url = "https://download.pytorch.org/whl/"
+explicit = true
+
+[tool.setuptools.packages.find]
+where = ["./"]
+
+[project.scripts]
+nemo_streaming_asr = "scripts.nemo_asr_streaming_server:main"

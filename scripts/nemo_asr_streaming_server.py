@@ -35,28 +35,20 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     # Model configuration
     model_name = "stt_en_fastconformer_hybrid_large_streaming_multi"
     lookahead_size = int(lookahead)
-    #decoder_type = "rnnt"
-    #decoding_strategy = "greedy" # "beam"
     streaming_result_delay_silence_threshold = 0.5 # seconds
     silence_threshold = 0.5 # seconds
-    #udp_host = "127.0.0.1"
-    #udp_port = 5656
+
     if(toggle_button_control):
         control_mode = "toggle"
     else:
-        control_mode = "press_and_hold_to_talk" # other control modes: "toggle", ...
-    #tcp_server_port = 27400
-    #verbose = False
-
-    project_path = Path(__file__).resolve(strict=True).parent
-    
+        control_mode = "press_and_hold_to_talk"
 
     # Initialize components
     asr_streamer = ASRStreamer(
-        model_name, 
-        lookahead_size, 
-        decoder_type=decoder_type, 
-        decoding_strategy=decoding_strategy, 
+        model_name,
+        lookahead_size,
+        decoder_type=decoder_type,
+        decoding_strategy=decoding_strategy,
         verbose=verbose
     )
     server = TranscriptionServer()
@@ -67,7 +59,6 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
         transcription_server=server,
         streaming_result_delay_silence_threshold=streaming_result_delay_silence_threshold,
         silence_threshold=silence_threshold,
-        project_path=project_path,
         verbose=verbose
     )
 
@@ -88,7 +79,7 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     old_settings = termios.tcgetattr(sys.stdin)
     try:
         tty.setcbreak(sys.stdin.fileno())
-        
+
         print("\n\nStreaming ASR Model loaded. Press 's' to manually toggle state {active, paused}, and 'm' to switch to toggle mode\n")
         while not asr_choreographer.was_killed:
             if select.select([sys.stdin], [], [], 0)[0]:

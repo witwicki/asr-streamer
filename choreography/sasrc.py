@@ -1,13 +1,12 @@
 """ Streaming ASR Choreographer """
 
-
+import os
 import signal
 import time
 import sys
 import numpy as np
 from threading import Event, Thread
 import wave
-from pathlib import Path
 
 from communication.server import TranscriptionServer
 from communication.rc import RemoteControl
@@ -20,7 +19,7 @@ class ASRChoreographer:
     for managing user interaction.
 
     """
-    def __init__(self, asr_streamer, transcription_server, streaming_result_delay_silence_threshold=0.5, silence_threshold=1.0, project_path=".", verbose=True):
+    def __init__(self, asr_streamer, transcription_server, streaming_result_delay_silence_threshold=0.5, silence_threshold=1.0, verbose=True):
         self.asr_streamer = asr_streamer
         self.transcription_server = transcription_server
         self.streaming_result_delay_silence_threshold = streaming_result_delay_silence_threshold
@@ -32,9 +31,11 @@ class ASRChoreographer:
         self.time_consumed_by_asr_processing = None
         self.time_since_last_asr_result = None
         self.is_active = False # active vs. passive (where ASR is still processing, just not sending the results)
-        self.project_path = project_path
         self.verbose = verbose
         self.init_time = time.time()
+
+        # project path is one level up from this file
+        self.project_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
         # handling of Ctrl-C
         self._exit_event = Event()
@@ -89,7 +90,7 @@ class ASRChoreographer:
 
     def recognize_speech(self, in_data, frame_count, time_info, status):
             start_time = time.time() # profile the runtime of this method, and track time in between results
-            t_chunk_start = self.frames_processed / ASRStreamer.SAMPLE_RATE 
+            t_chunk_start = self.frames_processed / ASRStreamer.SAMPLE_RATE
             self.frames_processed += frame_count
             t_chunk_end = self.frames_processed / ASRStreamer.SAMPLE_RATE
             signal = np.frombuffer(in_data, dtype=np.int16)
@@ -122,13 +123,13 @@ class ASRChoreographer:
                     # ...whereas here we are looking for natural gaps in between utterances
                     #      that serve to seed our next active asr session with an appropriate beginning
                     if self.deactivate_if_silence_threshold_exceeded(self.silence_threshold):
-                        # because asr is in passive mode, simply throw away the latest result 
+                        # because asr is in passive mode, simply throw away the latest result
                         self.asr_streamer.buffer = ""
             else:
                 if not self.verbose: # otherwise we would have already printed it above
                     print(f"ASR_result: [{text}]") #, end='\r')
                 self.asr_streamer.buffer = text
-                self.update_last_activity()                        
+                self.update_last_activity()
 
             return (in_data, self.pyaudio.paContinue)
 
@@ -158,8 +159,6 @@ class ASRChoreographer:
         self._exit_event.set()
         self._background_noise_thread.join()
         self.was_killed = True
-        #sys.exit("\n...program terminated by user.")
-
 
     def _background_thread_worker(self):
         # prepare to loop silence
@@ -175,36 +174,36 @@ class ASRChoreographer:
 
     def _init_silence_waveform(self):
         # load dummy wave file (need not be silence)
-        with wave.open(str(self.project_path.joinpath("assets/ui_sound_effects/beep-open.wav")), 'rb') as wf:
+        with wave.open(f"{self.project_path}/assets/ui_sound_effects/beep-open.wav", 'rb') as wf:
             data = wf.readframes(1000000) # the whole wave file
             # reduce volume to near zero in waveform
             data_readonly = np.frombuffer(data, dtype=np.int16).reshape(-1, wf.getnchannels())
             self._silence_audio_data = np.copy(data_readonly)
             np.multiply(self._silence_audio_data, 0.0002, out=self._silence_audio_data, casting="unsafe")
             # start a stream and close file
-            self._background_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf.getsampwidth()),  
-                channels = wf.getnchannels(),  
-                rate = wf.getframerate(),  
+            self._background_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf.getsampwidth()),
+                channels = wf.getnchannels(),
+                rate = wf.getframerate(),
                 output = True)
 
     def _init_toggling_waveforms(self):
         # load sounds from wave files
-        wf_activate = wave.open(str(self.project_path.joinpath("assets/ui_sound_effects/beep-open.wav")), 'rb')
-        wf_deactivate = wave.open(str(self.project_path.joinpath("assets/ui_sound_effects/beep-close.wav")), 'rb')
+        wf_activate = wave.open(f"{self.project_path}/assets/ui_sound_effects/beep-open.wav", 'rb')
+        wf_deactivate = wave.open(f"{self.project_path}/assets/ui_sound_effects/beep-close.wav", 'rb')
         data = wf_activate.readframes(1000000) # the whole wave file
         self._activate_audio_data = np.frombuffer(data, dtype=np.int16).reshape(-1, wf_activate.getnchannels())
         data = wf_deactivate.readframes(1000000)
         self._deactivate_audio_data = np.frombuffer(data, dtype=np.int16).reshape(-1, wf_deactivate
         .getnchannels())
         # start streams and close files
-        self._activate_sound_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf_activate.getsampwidth()),  
-            channels = wf_activate.getnchannels(),  
-            rate = wf_activate.getframerate(),  
+        self._activate_sound_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf_activate.getsampwidth()),
+            channels = wf_activate.getnchannels(),
+            rate = wf_activate.getframerate(),
             output = True)
         wf_activate.close()
-        self._deactivate_sound_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf_deactivate.getsampwidth()),  
-            channels = wf_deactivate.getnchannels(),  
-            rate = wf_deactivate.getframerate(),  
+        self._deactivate_sound_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf_deactivate.getsampwidth()),
+            channels = wf_deactivate.getnchannels(),
+            rate = wf_deactivate.getframerate(),
             output = True)
         wf_deactivate.close()
 
