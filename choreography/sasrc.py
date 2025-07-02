@@ -3,12 +3,9 @@
 import os
 import signal
 import time
-import sys
 import numpy as np
 from threading import Event, Thread
 import wave
-
-from communication.server import TranscriptionServer
 from communication.rc import RemoteControl
 from streaming.asr import ASRStreamer
 
@@ -19,11 +16,12 @@ class ASRChoreographer:
     for managing user interaction.
 
     """
-    def __init__(self, asr_streamer, transcription_server, streaming_result_delay_silence_threshold=0.5, silence_threshold=1.0, verbose=True):
+    def __init__(self, asr_streamer, transcription_server, streaming_result_delay_silence_threshold=0.5, silence_threshold=1.0, exercise_output_channel=True, verbose=True):
         self.asr_streamer = asr_streamer
         self.transcription_server = transcription_server
         self.streaming_result_delay_silence_threshold = streaming_result_delay_silence_threshold
         self.silence_threshold = silence_threshold
+        self.exercise_output_channel = exercise_output_channel
         self.waiting_for_silence_to_deactivate = False
         current_time = time.time()
         self.last_activity_time = current_time
@@ -48,9 +46,10 @@ class ASRChoreographer:
     def setup_audio_output(self, pyaudio_package, pyaudio_object):
         self.pyaudio = pyaudio_package
         self._pyaudio = pyaudio_object
-        # keep pyaudio output awake using silent stream
-        self._background_noise_thread = Thread(target=self._background_thread_worker)
-        self._background_noise_thread.start()
+        if self.exercise_output_channel:
+            # keep pyaudio output awake using silent stream
+            self._background_noise_thread = Thread(target=self._background_thread_worker)
+            self._background_noise_thread.start()
         # initialize sound effects
         self._init_toggling_waveforms()
 
@@ -157,7 +156,10 @@ class ASRChoreographer:
     def _force_exit_handler(self, sig, frame):
         print("\nCtrl-C pressed!")
         self._exit_event.set()
-        self._background_noise_thread.join()
+        self.transcription_server.close_connections()
+        self.close_sound_streams()
+        if self.exercise_output_channel:
+            self._background_noise_thread.join()
         self.was_killed = True
 
     def _background_thread_worker(self):
@@ -165,12 +167,11 @@ class ASRChoreographer:
         self._init_silence_waveform()
         # play until exit event occurs
         print("Silence-playing background thread started.")
-        # TODO instead listen to self.was_killed and forgo the sys.exit()
         while not self._exit_event.is_set():
             self._background_stream.write(self._silence_audio_data.tobytes())
+            time.sleep(0.01)
         self._background_stream.close()
         print("Finished silence-playing background thread.")
-        sys.exit() # this line intentionally throws an exception to bring the program down
 
     def _init_silence_waveform(self):
         # load dummy wave file (need not be silence)
@@ -179,7 +180,7 @@ class ASRChoreographer:
             # reduce volume to near zero in waveform
             data_readonly = np.frombuffer(data, dtype=np.int16).reshape(-1, wf.getnchannels())
             self._silence_audio_data = np.copy(data_readonly)
-            np.multiply(self._silence_audio_data, 0.0002, out=self._silence_audio_data, casting="unsafe")
+            np.multiply(self._silence_audio_data, 0.0003, out=self._silence_audio_data, casting="unsafe")
             # start a stream and close file
             self._background_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf.getsampwidth()),
                 channels = wf.getnchannels(),
@@ -212,3 +213,7 @@ class ASRChoreographer:
 
     def play_deactivate_sound(self):
         self._deactivate_sound_stream.write(self._deactivate_audio_data.tobytes())
+
+    def close_sound_streams(self):
+        self._activate_sound_stream.close()
+        self._deactivate_sound_stream.close()

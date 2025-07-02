@@ -26,6 +26,7 @@ dependencies = [
     "torchaudio",
     "torchaudio==2.5.1 ; platform_machine=='aarch64'",
     "wheel",
+    "pynput>=1.8.1",
 ]
 
 [tool.uv.sources]
@@ -35,6 +36,8 @@ torch = [
 torchaudio = [
     { index = "torchaudio-cu124", marker = "platform_machine=='aarch64'" },
 ]
+pynput = { git = "https://github.com/moses-palmer/pynput.git" }
+
 
 [[tool.uv.index]]
 name = "pytorch-cu124"
