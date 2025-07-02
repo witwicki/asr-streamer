@@ -7,7 +7,7 @@ from threading import Thread
 from streaming.asr import ASRStreamer
 from streaming.mic import AudioStreamManager
 from communication.server import TranscriptionServer
-from communication.rc import RemoteControl, RemoteControlByKeyboard
+from communication.rc import RemoteControl, RemoteControlByUDP, RemoteControlByKeyboard
 from choreography.sasrc import ASRChoreographer
 
 from pynput import keyboard
@@ -29,8 +29,9 @@ def run_remote_control(remote_control):
 @click.option('--rc_udp_host', default='0.0.0.0', help='The address (e.g., 0.0.0.0) over which to listen to UDP packets sent from the Remote-Control')
 @click.option('--rc_udp_port', default=5656, help='The port of the remote-control UDP host')
 @click.option('--toggle_button_control', is_flag=True, help='Set control mode to: button press turns on and off ASR, as opposed to the default press-and-hold-to-talk controls')
+@click.option('--keyboard', is_flag=True, help='Use the keyboard as your press-to-talk controller')
 @click.option('--verbose', '-v', is_flag=True, help='Show debug info and warnings on the terminal')
-def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_host, rc_udp_port, toggle_button_control, verbose):
+def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_host, rc_udp_port, toggle_button_control, keyboard, verbose):
 
     # Model configuration
     model_name = "stt_en_fastconformer_hybrid_large_streaming_multi"
@@ -72,8 +73,11 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     server.start_server(port=tcp_server_port)
 
     # start remote control interface in another thread
-    #remote_control_interface = RemoteControl(asr_choreographer, udp_host=rc_udp_host, udp_port=rc_udp_port, mode=control_mode)
-    remote_control_interface = RemoteControlByKeyboard(asr_choreographer, mode=control_mode)
+    remote_control_interface : RemoteControl
+    if keyboard:
+        remote_control_interface = RemoteControlByKeyboard(asr_choreographer, mode=control_mode)
+    else:
+        remote_control_interface = RemoteControlByUDP(asr_choreographer, udp_host=rc_udp_host, udp_port=rc_udp_port, mode=control_mode)
     thread_remote = Thread(target=run_remote_control, args=(remote_control_interface,))
     thread_remote.start()
 

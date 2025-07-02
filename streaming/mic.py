@@ -42,7 +42,6 @@ class AudioStreamManager:
             frames_per_buffer=int(ASRStreamer.SAMPLE_RATE * self.chunk_size / 1000) - 1
         )
         self.stream.start_stream()
-        print("~")
 
     def stop_stream(self):
         print("stopping...")
