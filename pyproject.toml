@@ -1,0 +1,58 @@
+[project]
+authors = [
+    { name = "Stefan Witwicki", email = "stefan@witwicki.info" },
+]
+name = "asr-streamer"
+version = "0.1.0"
+readme = "README.md"
+requires-python = "==3.10.*"
+dependencies = [
+    "click",
+    "cython",
+    "huggingface-hub",
+    "nemo-toolkit[asr]==2.0.0",
+    "numpy",
+    "omegaconf",
+    "packaging",
+    "pyaudio",
+    "torch",
+    "torchaudio",
+    "wheel",
+    "pynput>=1.8.1",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu124", marker = "platform_machine=='aarch64'" },
+]
+torchaudio = [
+    { index = "torchaudio-cu124", marker = "platform_machine=='aarch64'" },
+]
+pynput = { git = "https://github.com/moses-palmer/pynput.git" }
+
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
+name = "torchaudio-cu124"
+url = "https://download.pytorch.org/whl/"
+explicit = true
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["./"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+choreography = ["ui_sound_effects/*"]
+
+[project.scripts]
+nemo-streaming-asr = "scripts.nemo_asr_streaming_server:main"
