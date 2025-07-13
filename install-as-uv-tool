@@ -6,4 +6,4 @@ cd $(dirname "$(readlink -f "$0")")
 uv sync
 uv build
 # install the tools
-uv tool install $(ls --sort=time ./dist/*.gz) --force
+uv tool install $(ls -t -p -A ./dist/*.gz | head -n 1) --force
