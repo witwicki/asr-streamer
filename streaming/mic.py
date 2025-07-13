@@ -1,5 +1,3 @@
-import os, io, contextlib
-
 from choreography.sasrc import ASRChoreographer
 import streaming
 from streaming.asr import ASRStreamer
@@ -8,7 +6,7 @@ class AudioStreamManager:
     """ Manage audio stream from microphone
 
     Assumed to be invoked from an ASRChoreograoher, this class makes iterative
-    calls back to the choreographer's speech recognition method for each new 
+    calls back to the choreographer's speech recognition method for each new
     sample of audio received.
     """
 
@@ -22,7 +20,7 @@ class AudioStreamManager:
         self.chunk_size = chunk_size # ASR lookahead size + ENCODER_STEP_LENGTH
         self.stream = None
         print("...done initializing audio stream manager.")
-        
+
 
     @streaming.show_terminal_output
     def _initialize_pyaudio(self):
@@ -46,7 +44,10 @@ class AudioStreamManager:
         self.stream.start_stream()
 
     def stop_stream(self):
+        print("stopping...")
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
+        print("termination pyaudio...")
         self.p.terminate()
+        print("terminated!!!")

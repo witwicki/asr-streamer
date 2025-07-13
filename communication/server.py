@@ -13,7 +13,7 @@ class TranscriptionServer:
         self.asr_active = False
         self.connections_closed = False
         self.buffer = ""
-        
+
     def start_server(self, host='0.0.0.0', port=27400):
         """Start TCP server and wait for a single client connection."""
         print("Starting transcription server...")
@@ -23,11 +23,11 @@ class TranscriptionServer:
         self.server_socket.setblocking(False)
         self.server_socket.listen(1)
         print(f"...advertising on TCP:{host}:{port}")
-        
+
         # Wait for client connection in separate thread
         self.client_thread = threading.Thread(target=self.accept_client)
         self.client_thread.start()
-    
+
     def accept_client(self):
         """Accept client connection or reconnection"""
         while not self.connections_closed:
@@ -40,7 +40,7 @@ class TranscriptionServer:
                 if self.client_socket is None:
                     print("...waiting for a TCP listener to connect...")
                 time.sleep(1.0)
-        
+
     def send_transcription(self, transcription):
         """Send buffered transcription over TCP connection."""
         if self.client_socket:
@@ -54,7 +54,7 @@ class TranscriptionServer:
                 self.close_connection()
             except Exception as e:
                 print(f"Error sending transcription: {e}")
-    
+
     def close_connections(self):
         """Close TCP connections."""
         print("Closing TCP connections...")

@@ -91,7 +91,7 @@ class ASRChoreographer:
 
     def recognize_speech(self, in_data, frame_count, time_info, status):
             start_time = time.time() # profile the runtime of this method, and track time in between results
-            t_chunk_start = self.frames_processed / ASRStreamer.SAMPLE_RATE 
+            t_chunk_start = self.frames_processed / ASRStreamer.SAMPLE_RATE
             self.frames_processed += frame_count
             t_chunk_end = self.frames_processed / ASRStreamer.SAMPLE_RATE
             signal = np.frombuffer(in_data, dtype=np.int16)
@@ -125,13 +125,13 @@ class ASRChoreographer:
                     # ...whereas here we are looking for natural gaps in between utterances
                     #      that serve to seed our next active asr session with an appropriate beginning
                     if self.deactivate_if_silence_threshold_exceeded(self.silence_threshold):
-                        # because asr is in passive mode, simply throw away the latest result 
+                        # because asr is in passive mode, simply throw away the latest result
                         self.asr_streamer.buffer = ""
             else:
                 if not self.verbose: # otherwise we would have already printed it above
                     print(f"ASR_result: [{text}]") #, end='\r')
                 self.asr_streamer.buffer = text
-                self.update_last_activity()                        
+                self.update_last_activity()
 
             return (in_data, self.pyaudio.paContinue)
 
@@ -146,7 +146,7 @@ class ASRChoreographer:
             print(f"ASRChoreographer.deactivate_if_silence_threshold_exceeded({threshold})")
         if (self.time_since_last_speech_activity_detected() - self.time_since_last_asr_result) >= threshold:
             if self.verbose:
-                print(f"\nAutomatically deactivating ASR due to silence.")
+                print("\nAutomatically deactivating ASR due to silence.")
             self.set_asr_state(active=False)
             self.waiting_for_silence_to_deactivate = False # state reset
             return True
