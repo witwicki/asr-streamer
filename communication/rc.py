@@ -1,14 +1,7 @@
 import socket
 import time
-
-try:
-    from choreography.sasrc import ASRChoreographer
-except ImportError:
-    # avoiding circular dependency
-    ASRChoreographer = None
-
 from pynput import keyboard
-
+from choreography.sasrc import ASRChoreographer
 
 class RemoteControl:
     """ Base class for controlling an ASR session remotely """
