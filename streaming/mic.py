@@ -1,4 +1,3 @@
-from choreography.sasrc import ASRChoreographer
 import streaming
 from streaming.asr import ASRStreamer
 
@@ -27,6 +26,7 @@ class AudioStreamManager:
         import pyaudio
         self.pyaudio = pyaudio
         self.p = pyaudio.PyAudio()
+        self.input_device_index : int = int(self.p.get_default_input_device_info()['index'])
 
     def _pass_pyaudio_object_back_to_choreographer(self):
         self.asr_choreographer.setup_audio_output(self.pyaudio, self.p)
@@ -37,7 +37,7 @@ class AudioStreamManager:
             channels=1,
             rate=ASRStreamer.SAMPLE_RATE,
             input=True,
-            input_device_index=self.p.get_default_input_device_info()['index'],
+            input_device_index=self.input_device_index,
             stream_callback=self.asr_choreographer.recognize_speech,
             frames_per_buffer=int(ASRStreamer.SAMPLE_RATE * self.chunk_size / 1000) - 1
         )

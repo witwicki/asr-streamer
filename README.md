@@ -2,7 +2,13 @@
 
 ## Description
 
-The beginnings of a platform for invoking ASR models on streaming audio inputs.
+asr-streamer is intended as a platform for evaluating and deploying ASR models on streaming audio inputs.
+
+Key features:
+
+- Invocation of **streaming** inference models for automated speech recognition, starting with [NVIDIA's Fast-Conformer Model](https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi)
+- Publishing of recognized speech over TCP
+- Press-to-talk UI by remote control, so the user can decide when to speech transcriptions are recorded and publishef\d
 
 ## Prerequisites
 
@@ -34,6 +40,7 @@ uv run nemo-streaming-asr --help
 ```
 
 ## Install as a tool to run from anywhere in userspace
+
 ```bash
 ./install-as-tool
 nemo-streaming-asr --help

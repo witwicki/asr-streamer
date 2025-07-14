@@ -32,9 +32,10 @@ class TranscriptionServer:
         """Accept client connection or reconnection"""
         while not self.connections_closed:
             try:
-                self.client_socket, addr = self.server_socket.accept()
-                print(f"Connected by {addr}.  Socket={self.client_socket}")
-            except BlockingIOError as e:
+                if self.server_socket:
+                    self.client_socket, addr = self.server_socket.accept()
+                    print(f"Connected by {addr}.  Socket={self.client_socket}")
+            except BlockingIOError:
                 pass
             finally:
                 if self.client_socket is None:
@@ -51,7 +52,7 @@ class TranscriptionServer:
                 print(f'Sending over TCP: "{transcription}"')
             except ConnectionResetError:
                 print("Client disconnected unexpectedly.")
-                self.close_connection()
+                self.close_connections()
             except Exception as e:
                 print(f"Error sending transcription: {e}")
 

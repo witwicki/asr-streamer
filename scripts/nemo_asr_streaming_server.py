@@ -10,8 +10,6 @@ from communication.server import TranscriptionServer
 from communication.rc import RemoteControl, RemoteControlByUDP, RemoteControlByKeyboard
 from choreography.sasrc import ASRChoreographer
 
-from pynput import keyboard
-
 import click
 
 def run_stream_manager(stream_manager):
@@ -86,15 +84,10 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
         time.sleep(0.01)
 
     # cleanup
-    # TODO: more graceful cleanup
     stream_manager.stop_stream()
-    server.close_connections()
     remote_control_interface.end()
     thread_remote.join()
     thread_stream.join()
-
-
-
 
 
 
