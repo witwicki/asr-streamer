@@ -51,8 +51,6 @@ class ASRStreamer:
         self.nemo_asr = nemo_asr
         from nemo.collections.asr.models.ctc_bpe_models import EncDecCTCModelBPE
         self.EncDecCTCModelBPE = EncDecCTCModelBPE
-        from nemo.collections.asr.models.configs.asr_models_config import CacheAwareStreamingConfig
-        self.CacheAwareStreamingConfig = CacheAwareStreamingConfig
         from nemo.collections.asr.parts.utils.rnnt_utils import Hypothesis
         self.Hypothesis = Hypothesis
 
@@ -66,41 +64,40 @@ class ASRStreamer:
             ValueError: If an invalid lookahead_size is provided for the streaming ConformerEncoder.
         """
         self.asr_model = self.nemo_asr.models.ASRModel.from_pretrained(model_name=self.model_name)
-        if isinstance(self.asr_model, self.nemo_asr.models.ASRModel):
-            if self.model_name == "stt_en_fastconformer_hybrid_large_streaming_multi":
-                if self.lookahead_size not in [0, 80, 480, 1040]:
-                    raise ValueError(f"Invalid lookahead_size {self.lookahead_size}")
-                if isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder):
-                    left_context_size = self.asr_model.encoder.att_context_size[0]
-                    self.asr_model.encoder.set_default_att_context_size(
-                        [left_context_size, int(self.lookahead_size / ASRStreamer.ENCODER_STEP_LENGTH)]
-                    )
+        assert isinstance(self.asr_model, self.nemo_asr.models.EncDecHybridRNNTCTCBPEModel)
+        if self.model_name == "stt_en_fastconformer_hybrid_large_streaming_multi":
+            assert isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder)
+            if self.lookahead_size not in [0, 80, 480, 1040]:
+                raise ValueError(f"Invalid lookahead_size {self.lookahead_size}")
+            left_context_size = self.asr_model.encoder.att_context_size[0]
+            self.asr_model.encoder.set_default_att_context_size(
+                [left_context_size, int(self.lookahead_size / ASRStreamer.ENCODER_STEP_LENGTH)]
+            )
 
         # set decoding strategy
-        if isinstance(self.asr_model, self.nemo_asr.models.EncDecHybridRNNTCTCBPEModel):
-            self.asr_model.change_decoding_strategy(decoder_type=self.decoder_type)
-            decoding_cfg = self.asr_model.cfg.decoding
-            with self.open_dict(decoding_cfg):
-                # save time by doing greedy decoding and not trying to record the alignments
-                if self.decoding_strategy == "greedy":
-                    decoding_cfg.strategy = "greedy"
-                    decoding_cfg.preserve_alignments = False
-                    if hasattr(self.asr_model, 'joint'):  # if an RNNT model
-                        # restrict max_symbols to make sure not stuck in infinite loop
-                        decoding_cfg.greedy.max_symbols = 50
-                        # sensible default parameter, but not necessary since batch size is 1
-                        decoding_cfg.fused_batch_size = -1
-                    self.asr_model.change_decoding_strategy(decoding_cfg)
-                elif self.decoding_strategy == "beam":
-                    decoding_cfg.strategy = "beam"
-                    self.asr_model.change_decoding_strategy(decoding_cfg)
-                else:
-                    raise ValueError(f"Invalid decoding strategy {self.decoding_strategy} for {self.decoder_type} model!")
+        self.asr_model.change_decoding_strategy(decoder_type=self.decoder_type)
+        decoding_cfg = self.asr_model.cfg.decoding
+        with self.open_dict(decoding_cfg):
+            # save time by doing greedy decoding and not trying to record the alignments
+            if self.decoding_strategy == "greedy":
+                decoding_cfg.strategy = "greedy"
+                decoding_cfg.preserve_alignments = False
+                if hasattr(self.asr_model, 'joint'):  # if an RNNT model
+                    # restrict max_symbols to make sure not stuck in infinite loop
+                    decoding_cfg.greedy.max_symbols = 50
+                    # sensible default parameter, but not necessary since batch size is 1
+                    decoding_cfg.fused_batch_size = -1
+                self.asr_model.change_decoding_strategy(decoding_cfg)
+            elif self.decoding_strategy == "beam":
+                decoding_cfg.strategy = "beam"
+                self.asr_model.change_decoding_strategy(decoding_cfg)
+            else:
+                raise ValueError(f"Invalid decoding strategy {self.decoding_strategy} for {self.decoder_type} model!")
 
         # set model into inference mode (as opposed to training), and re
-        if isinstance(self.asr_model, torch.nn.Module):
-            self.asr_model.eval()
-            self.device = self.asr_model.device
+        assert isinstance(self.asr_model, torch.nn.Module)
+        self.asr_model.eval()
+        self.device = self.asr_model.device
 
         # initiallize audio preprocessor
         self.preprocessor = self._init_preprocessor()
@@ -115,38 +112,43 @@ class ASRStreamer:
         Returns:
             EncDecCTCModelBPE: The initialized audio preprocessor.
         """
-        if isinstance(self.asr_model, self.nemo_asr.models.ASRModel): # just type hinting
-            cfg = copy.deepcopy(self.asr_model._cfg)
-            self.OmegaConf.set_struct(cfg.preprocessor, False)
-            cfg.preprocessor.dither = 0.0
-            cfg.preprocessor.pad_to = 0
-            cfg.preprocessor.normalize = "None"
-            preprocessor = self.EncDecCTCModelBPE.from_config_dict(cfg.preprocessor)
-            preprocessor.to(self.device)
-            return preprocessor
-        else:
-            return self.EncDecCTCModelBPE(self.OmegaConf.create())
+        assert isinstance(self.asr_model, self.nemo_asr.models.ASRModel)
+        cfg = copy.deepcopy(self.asr_model._cfg)
+        self.OmegaConf.set_struct(cfg.preprocessor, False)
+        cfg.preprocessor.dither = 0.0
+        cfg.preprocessor.pad_to = 0
+        cfg.preprocessor.normalize = "None"
+        preprocessor = self.EncDecCTCModelBPE.from_config_dict(cfg.preprocessor)
+        preprocessor.to(self.device)
+        return preprocessor
 
     def _init_streaming_state(self):
+        """
+        Initialize the streaming state required for speech recognition.
+
+        This method initializes necessary variables and cache states that will be used
+        to store intermediate results during the streaming inference process. These include
+        previous hypotheses, prediction output stream, step number, and initial cache states
+        for the encoder.
+        """
+        assert isinstance(self.asr_model, self.nemo_asr.models.EncDecRNNTModel)
+        assert isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder)
         self.previous_hypotheses = None
         self.pred_out_stream = torch.Tensor()
         self.step_num = 0
-        if isinstance(self.asr_model, self.nemo_asr.models.EncDecHybridRNNTCTCBPEModel): # type hinting
-            if isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder): # type hinting
-                (
-                    self.cache_last_channel,
-                    self.cache_last_time,
-                    self.cache_last_channel_len
-                ) = self.asr_model.encoder.get_initial_cache_state(batch_size=1)
-                pre_encode_cache_sizes = self.asr_model.encoder.streaming_cfg.pre_encode_cache_size
-                #if isinstance(config, self.CacheAwareStreamingConfig):
-                # hack for typechecking on nemo's erroneous CacheAwareStreamingConfig definition... (pre_encode_cache_size is actually of type list[int])
-                self.pre_encode_cache_size : int = pre_encode_cache_sizes if isinstance(pre_encode_cache_sizes, int) else pre_encode_cache_sizes[1]
-                num_channels = self.asr_model.cfg.preprocessor.features
-                if isinstance(self.device, torch.device): # type hinting / enforcement
-                    self.cache_pre_encode = torch.zeros(
-                        size=(1, num_channels, self.pre_encode_cache_size), device=self.device
-                    )
+        (
+            self.cache_last_channel,
+            self.cache_last_time,
+            self.cache_last_channel_len
+        ) = self.asr_model.encoder.get_initial_cache_state(batch_size=1)
+        pre_encode_cache_sizes = self.asr_model.encoder.streaming_cfg.pre_encode_cache_size
+        # hack for typechecking on nemo's erroneous CacheAwareStreamingConfig definition... (pre_encode_cache_size is actually of type list[int])
+        self.pre_encode_cache_size : int = pre_encode_cache_sizes if isinstance(pre_encode_cache_sizes, int) else pre_encode_cache_sizes[1]
+        num_channels = self.asr_model.cfg.preprocessor.features
+        assert isinstance(self.device, torch.device)
+        self.cache_pre_encode = torch.zeros(
+            size=(1, num_channels, self.pre_encode_cache_size), device=self.device
+        )
 
     def reset_streaming_state(self):
         """Clear the transcription and assocated buffers in between transcription sessions,
@@ -166,12 +168,12 @@ class ASRStreamer:
         """
         processed_signal = torch.Tensor()
         processed_signal_length = torch.Tensor()
-        if isinstance(self.device, torch.device): # type hinting / enforcement
-            audio_signal = torch.from_numpy(audio).unsqueeze_(0).to(self.device)
-            audio_signal_len = torch.Tensor([audio.shape[0]]).to(self.device)
-            processed_signal, processed_signal_length = self.preprocessor(
-                input_signal=audio_signal, length=audio_signal_len
-            )
+        assert isinstance(self.device, torch.device)
+        audio_signal = torch.from_numpy(audio).unsqueeze_(0).to(self.device)
+        audio_signal_len = torch.Tensor([audio.shape[0]]).to(self.device)
+        processed_signal, processed_signal_length = self.preprocessor(
+            input_signal=audio_signal, length=audio_signal_len
+        )
         return processed_signal, processed_signal_length
 
     def _extract_transcriptions(self, hyps):
@@ -183,7 +185,8 @@ class ASRStreamer:
         Returns:
             list: A list of transcribed texts.
         """
-        if self.decoding_strategy == "greedy" and isinstance(hyps[0], self.Hypothesis):
+        if self.decoding_strategy == "greedy":
+            assert isinstance(hyps[0], self.Hypothesis)
             return [hyp.text for hyp in hyps]
         else:
             # TODO return both dimensions for beam search
@@ -200,18 +203,7 @@ class ASRStreamer:
         Returns:
             str: The most likely transcribed text.
         """
-        if self.decoding_strategy == "beam":
-            raise NotImplementedError("Transcription extraction not yet implmented for beam search")
-            # TODO do this correctly for beam search
-            # additional details
-            #print(f"self._extract_transcriptions(transcribed_texts) = [{self._extract_transcriptions(transcribed_texts)}]")
-            #for hyp in transcribed_texts[0]:
-                #print(f"hyp={hyp}")
-                #print(f"text={hyp.text}")
-                #print(f"   score={hyp.score}")
-                #print(f"   y_sequence={hyp.y_sequence}")
-        else:
-            return self._extract_transcriptions(hyps)[0]
+        return self._extract_transcriptions(hyps)[0]
 
     def process_chunk(self, audio_chunk, limited_cache=False):
         """
@@ -238,8 +230,7 @@ class ASRStreamer:
         self.cache_pre_encode = processed_signal[:, :, -self.pre_encode_cache_size:]
 
         # Inference
-        transcription = ""
-        transcribed_texts = []
+        assert isinstance(self.asr_model, self.nemo_asr.models.EncDecHybridRNNTCTCBPEModel), "Only EncDecHybridRNNTCTCBPEModel is supported"
         # build kwargs dynamically
         kwargs = {
             "processed_signal": processed_signal,
@@ -255,16 +246,15 @@ class ASRStreamer:
         if self.previous_hypotheses:
             kwargs["previous_hypotheses"] = self.previous_hypotheses
             kwargs["previous_pred_out"] = self.pred_out_stream
-        if isinstance(self.asr_model, self.nemo_asr.models.EncDecHybridRNNTCTCBPEModel): # type hinting
-            with torch.no_grad():
-                (
-                    self.pred_out_stream,
-                    transcribed_texts,
-                    self.cache_last_channel,
-                    self.cache_last_time,
-                    self.cache_last_channel_len,
-                    self.previous_hypotheses
-                ) = self.asr_model.conformer_stream_step(**kwargs)
+        # streaming inference step
+        (
+            self.pred_out_stream,
+            transcribed_texts,
+            self.cache_last_channel,
+            self.cache_last_time,
+            self.cache_last_channel_len,
+            self.previous_hypotheses
+        ) = self.asr_model.conformer_stream_step(**kwargs)
         self.step_num += 1
         # extract transcription
         transcription = self._extract_most_likely_transcription(transcribed_texts)
