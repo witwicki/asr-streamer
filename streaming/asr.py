@@ -1,3 +1,5 @@
+from typing import Tuple
+import sys, os
 import copy
 import torch
 import numpy as np
@@ -63,7 +65,21 @@ class ASRStreamer:
         Raises:
             ValueError: If an invalid lookahead_size is provided for the streaming ConformerEncoder.
         """
-        self.asr_model = self.nemo_asr.models.ASRModel.from_pretrained(model_name=self.model_name)
+        # set device intelligently
+        if torch.cuda.is_available():
+            map_location = torch.device('cuda:0')  # use 0th CUDA device
+            print("...using NVIDIA GPU cuda:0...")
+        elif torch.backends.mps.is_available():
+            print("...using MPS (Apple Silicon acceleration)...")
+            mps_fallback = os.getenv("PYTORCH_ENABLE_MPS_FALLBACK")
+            if not mps_fallback:
+                print("WARNING: Environment variable `PYTORCH_ENABLE_MPS_FALLBACK=1` might need to be set to avoid failures.")
+            map_location = torch.device('mps')
+        else:
+            sys.exit("No GPU detected!  This probably won't run well on your cpu.  Exiting...")
+
+        # load model
+        self.asr_model = self.nemo_asr.models.ASRModel.from_pretrained(model_name=self.model_name, map_location=map_location)
         assert isinstance(self.asr_model, self.nemo_asr.models.EncDecHybridRNNTCTCBPEModel)
         if self.model_name == "stt_en_fastconformer_hybrid_large_streaming_multi":
             assert isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder)
@@ -73,7 +89,6 @@ class ASRStreamer:
             self.asr_model.encoder.set_default_att_context_size(
                 [left_context_size, int(self.lookahead_size / ASRStreamer.ENCODER_STEP_LENGTH)]
             )
-
         # set decoding strategy
         self.asr_model.change_decoding_strategy(decoder_type=self.decoder_type)
         decoding_cfg = self.asr_model.cfg.decoding
@@ -155,7 +170,7 @@ class ASRStreamer:
         effectively applying the model anew on the next inference step."""
         self._init_streaming_state()
 
-    def preprocess_audio(self, audio):
+    def preprocess_audio(self, audio) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Preprocess the input audio chunk to be ready for inference by the ASR model.
 
