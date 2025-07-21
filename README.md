@@ -42,6 +42,6 @@ uv run nemo-streaming-asr --help
 ## Install as a tool to run from anywhere in userspace
 
 ```bash
-./install-as-tool
+./install-as-uv-tool
 nemo-streaming-asr --help
 ```
