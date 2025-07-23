@@ -184,7 +184,7 @@ class ASRChoreographer:
                 # reduce volume to near zero in waveform
                 data_readonly = np.frombuffer(data, dtype=np.int16).reshape(-1, wf.getnchannels())
                 self._silence_audio_data = np.copy(data_readonly)
-                np.multiply(self._silence_audio_data, 0.0003, out=self._silence_audio_data, casting="unsafe")
+                np.multiply(self._silence_audio_data, 0.00001, out=self._silence_audio_data, casting="unsafe")
                 # start a stream and close file
                 self._background_stream = self._pyaudio.open(format = self._pyaudio.get_format_from_width(wf.getsampwidth()),
                     channels = wf.getnchannels(),
