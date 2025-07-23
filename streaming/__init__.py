@@ -1,6 +1,6 @@
 import os, sys, io, contextlib
 
-def show_terminal_output(func):
+def suppress_terminal_output(func):
     """ A useful decorator to be applied to instance methods that take self.verbose=False as a cue to suppress all output """
     def wrapper(self, *args, **kwargs):
         if not self.verbose:

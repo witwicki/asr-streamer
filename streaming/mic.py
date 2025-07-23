@@ -21,7 +21,7 @@ class AudioStreamManager:
         print("...done initializing audio stream manager.")
 
 
-    @streaming.show_terminal_output
+    @streaming.suppress_terminal_output
     def _initialize_pyaudio(self):
         import pyaudio
         self.pyaudio = pyaudio

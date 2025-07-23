@@ -40,7 +40,7 @@ class ASRStreamer:
         self.buffer = "" # the buffer of recognized text
         print("...done initializing ASR model.")
 
-    @streaming.show_terminal_output
+    @streaming.suppress_terminal_output
     def _import_nemo_packages(self):
         """Import required packages for NeMo ASR and store some of the imported
         class referenes for easy reference by other class methods.   This methods also

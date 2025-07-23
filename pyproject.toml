@@ -3,14 +3,14 @@ authors = [
     { name = "Stefan Witwicki", email = "stefan@witwicki.info" },
 ]
 name = "asr-streamer"
-version = "0.2.0"
+version = "0.3.0"
 readme = "README.md"
 requires-python = "==3.10.*"
 dependencies = [
     "click",
     "cython",
     "huggingface-hub",
-    "nemo-toolkit[asr]==2.0.0",
+    "nemo-toolkit[asr]",
     "numpy",
     "omegaconf",
     "packaging",
