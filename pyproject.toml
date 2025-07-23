@@ -1,22 +1,18 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-authors = [
-  {name = "Stefan Witwicki", email = "witwicki@gmail.com"},
-]
+authors = [{ name = "Stefan Witwicki", email = "stefan@witwicki.info" }]
 name = "asr-streamer"
-version = "0.1.0"
+version = "0.3.0"
 readme = "README.md"
 requires-python = "==3.10.*"
 dependencies = [
     "click",
     "cython",
-    "huggingface-hub==0.23.2",
-    "nemo-toolkit[asr] ; platform_machine=='x86_64'",
+    "nemo-toolkit[asr]",
     "nemo-toolkit[asr]==2.0.0rc0 ; platform_machine=='arm64'",
     "nemo-toolkit[asr]==2.0.0rc0 ; platform_machine=='aarch64'",
+    "huggingface-hub",
+    "huggingface-hub==0.23.2 ; platform_machine=='arm64'",
+    "huggingface-hub==0.23.2 ; platform_machine=='aarch64'",
     "numpy",
     "omegaconf",
     "packaging",
@@ -26,15 +22,17 @@ dependencies = [
     "torchaudio",
     "torchaudio==2.5.1 ; platform_machine=='aarch64'",
     "wheel",
+    "torchaudio",
+    "wheel",
+    "pynput>=1.8.1",
 ]
 
 [tool.uv.sources]
-torch = [
-    { index = "pytorch-cu124", marker = "platform_machine=='aarch64'" },
-]
+torch = [{ index = "pytorch-cu124", marker = "platform_machine=='aarch64'" }]
 torchaudio = [
     { index = "torchaudio-cu124", marker = "platform_machine=='aarch64'" },
 ]
+pynput = { git = "https://github.com/moses-palmer/pynput.git" }
 
 [[tool.uv.index]]
 name = "pytorch-cu124"
@@ -46,8 +44,18 @@ name = "torchaudio-cu124"
 url = "https://download.pytorch.org/whl/"
 explicit = true
 
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
 where = ["./"]
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+choreography = ["ui_sound_effects/*"]
+
 [project.scripts]
-nemo_streaming_asr = "scripts.nemo_asr_streaming_server:main"
+nemo-streaming-asr = "scripts.nemo_asr_streaming_server:main"

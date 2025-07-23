@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# change into this directory
+cd $(dirname "$(readlink -f "$0")")
+# build the project
+uv sync
+uv build
+# install the tools
+uv tool install $(ls -t -p -A ./dist/*.gz | head -n 1) --force

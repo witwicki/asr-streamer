@@ -1,6 +1,3 @@
-import os, io, contextlib
-
-from choreography.sasrc import ASRChoreographer
 import streaming
 from streaming.asr import ASRStreamer
 
@@ -8,7 +5,7 @@ class AudioStreamManager:
     """ Manage audio stream from microphone
 
     Assumed to be invoked from an ASRChoreograoher, this class makes iterative
-    calls back to the choreographer's speech recognition method for each new 
+    calls back to the choreographer's speech recognition method for each new
     sample of audio received.
     """
 
@@ -22,13 +19,14 @@ class AudioStreamManager:
         self.chunk_size = chunk_size # ASR lookahead size + ENCODER_STEP_LENGTH
         self.stream = None
         print("...done initializing audio stream manager.")
-        
 
-    @streaming.show_terminal_output
+
+    @streaming.suppress_terminal_output
     def _initialize_pyaudio(self):
         import pyaudio
         self.pyaudio = pyaudio
         self.p = pyaudio.PyAudio()
+        self.input_device_index : int = int(self.p.get_default_input_device_info()['index'])
 
     def _pass_pyaudio_object_back_to_choreographer(self):
         self.asr_choreographer.setup_audio_output(self.pyaudio, self.p)
@@ -39,14 +37,17 @@ class AudioStreamManager:
             channels=1,
             rate=ASRStreamer.SAMPLE_RATE,
             input=True,
-            input_device_index=self.p.get_default_input_device_info()['index'],
+            input_device_index=self.input_device_index,
             stream_callback=self.asr_choreographer.recognize_speech,
             frames_per_buffer=int(ASRStreamer.SAMPLE_RATE * self.chunk_size / 1000) - 1
         )
         self.stream.start_stream()
 
     def stop_stream(self):
+        print("stopping...")
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
+        print("termination pyaudio...")
         self.p.terminate()
+        print("terminated!!!")
