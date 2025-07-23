@@ -137,6 +137,25 @@ class ASRStreamer:
         preprocessor.to(self.device)
         return preprocessor
 
+    def reset_streaming_state(self):
+        """Clear the transcription and assocated buffers in between transcription sessions,
+        effectively applying the model anew on the next inference step."""
+        assert isinstance(self.asr_model, self.nemo_asr.models.EncDecRNNTModel)
+        assert isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder)
+        self.previous_hypotheses = None
+        # ensure tensor memory is freed
+        if self.pred_out_stream:
+            for tensor in self.pred_out_stream:
+                del tensor
+            self.pred_out_stream.clear()
+        self.step_num = 0
+        (
+            self.cache_last_channel,
+            self.cache_last_time,
+            self.cache_last_channel_len
+        ) = self.asr_model.encoder.get_initial_cache_state(batch_size=1)
+        self.cache_pre_encode.zero_()
+
     def _init_streaming_state(self):
         """
         Initialize the streaming state required for speech recognition.
@@ -146,29 +165,18 @@ class ASRStreamer:
         previous hypotheses, prediction output stream, step number, and initial cache states
         for the encoder.
         """
+        self.previous_hypotheses = None
+        self.pred_out_stream = [] #torch.Tensor()
         assert isinstance(self.asr_model, self.nemo_asr.models.EncDecRNNTModel)
         assert isinstance(self.asr_model.encoder, self.nemo_asr.modules.ConformerEncoder)
-        self.previous_hypotheses = None
-        self.pred_out_stream = torch.Tensor()
-        self.step_num = 0
-        (
-            self.cache_last_channel,
-            self.cache_last_time,
-            self.cache_last_channel_len
-        ) = self.asr_model.encoder.get_initial_cache_state(batch_size=1)
         pre_encode_cache_sizes = self.asr_model.encoder.streaming_cfg.pre_encode_cache_size
         # hack for typechecking on nemo's erroneous CacheAwareStreamingConfig definition... (pre_encode_cache_size is actually of type list[int])
         self.pre_encode_cache_size : int = pre_encode_cache_sizes if isinstance(pre_encode_cache_sizes, int) else pre_encode_cache_sizes[1]
         num_channels = self.asr_model.cfg.preprocessor.features
-        assert isinstance(self.device, torch.device)
         self.cache_pre_encode = torch.zeros(
             size=(1, num_channels, self.pre_encode_cache_size), device=self.device
         )
-
-    def reset_streaming_state(self):
-        """Clear the transcription and assocated buffers in between transcription sessions,
-        effectively applying the model anew on the next inference step."""
-        self._init_streaming_state()
+        self.reset_streaming_state()
 
     def preprocess_audio(self, audio) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -181,14 +189,14 @@ class ASRStreamer:
             torch.Tensor: The preprocessed audio signal tensor.
             torch.Tensor: The length of the processed audio signal tensor.
         """
-        processed_signal = torch.Tensor()
-        processed_signal_length = torch.Tensor()
         assert isinstance(self.device, torch.device)
         audio_signal = torch.from_numpy(audio).unsqueeze_(0).to(self.device)
         audio_signal_len = torch.Tensor([audio.shape[0]]).to(self.device)
         processed_signal, processed_signal_length = self.preprocessor(
             input_signal=audio_signal, length=audio_signal_len
         )
+        del audio_signal
+        del audio_signal_len
         return processed_signal, processed_signal_length
 
     def _extract_transcriptions(self, hyps):
@@ -262,17 +270,20 @@ class ASRStreamer:
             kwargs["previous_hypotheses"] = self.previous_hypotheses
             kwargs["previous_pred_out"] = self.pred_out_stream
         # streaming inference step
-        (
-            self.pred_out_stream,
-            transcribed_texts,
-            self.cache_last_channel,
-            self.cache_last_time,
-            self.cache_last_channel_len,
-            self.previous_hypotheses
-        ) = self.asr_model.conformer_stream_step(**kwargs)
+        with torch.no_grad():
+            (
+                self.pred_out_stream,
+                transcribed_texts,
+                self.cache_last_channel,
+                self.cache_last_time,
+                self.cache_last_channel_len,
+                self.previous_hypotheses
+            ) = self.asr_model.conformer_stream_step(**kwargs)
         self.step_num += 1
         # extract transcription
         transcription = self._extract_most_likely_transcription(transcribed_texts)
+        del processed_signal
+        del processed_signal_len
         return transcription
 
 
