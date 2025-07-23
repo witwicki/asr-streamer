@@ -1,6 +1,5 @@
 import socket
 import time
-from pynput import keyboard
 from choreography.sasrc import ASRChoreographer
 
 class RemoteControl:
@@ -51,23 +50,25 @@ class RemoteControlByKeyboard(RemoteControl):
 
     def __init__(self, asr_choreographer: ASRChoreographer, mode="toggle"):
         super().__init__(asr_choreographer, mode)
+        from pynput import keyboard
+        self.keyboard = keyboard
 
     def run(self):
-        with keyboard.Listener(on_press=self._on_key_press, on_release=self._on_key_release) as listener:
+        with self.keyboard.Listener(on_press=self._on_key_press, on_release=self._on_key_release) as listener:
             while not self.was_killed:
                 time.sleep(0.01)
             listener.stop()
 
     def _on_key_press(self, key):
         try:
-            if key == keyboard.Key.space:  # Use alt as the control key
+            if key == self.keyboard.Key.space:  # Use alt as the control key
                 self._handle_control_event(True)
         except AttributeError:
             pass
 
     def _on_key_release(self, key):
         try:
-            if key == keyboard.Key.space:  # Use alt as the control key
+            if key == self.keyboard.Key.space:  # Use alt as the control key
                 self._handle_control_event(False)
         except AttributeError:
             pass
