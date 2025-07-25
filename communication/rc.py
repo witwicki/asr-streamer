@@ -5,9 +5,11 @@ from choreography.sasrc import ASRChoreographer
 class RemoteControl:
     """ Base class for controlling an ASR session remotely """
 
-    def __init__(self, asr_choreographer: ASRChoreographer, mode="toggle"):
+    def __init__(self, asr_choreographer: ASRChoreographer, mode="toggle", udp_port=5656):
         self.asr_choreographer = asr_choreographer
         self.mode = mode
+        # udp port for sending and receiving
+        self.udp_port = udp_port
         # assume that the current state of control is the initial state of the choreographer
         self.current_state = asr_choreographer.is_active
         self.was_killed = False
@@ -48,10 +50,17 @@ class RemoteControlByKeyboard(RemoteControl):
     In the simplest form, key presses and releases start and stop the transcription-gathering choreographer.
     """
 
-    def __init__(self, asr_choreographer: ASRChoreographer, mode="toggle"):
-        super().__init__(asr_choreographer, mode)
+    def __init__(self, asr_choreographer: ASRChoreographer, mode="toggle", udp_port=5656):
+        super().__init__(asr_choreographer, mode, udp_port)
         from pynput import keyboard
         self.keyboard = keyboard
+        # udp socket for sending events
+        self.udp_destination = "localhost"
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def _send_signal_over_udp(self, on: bool):
+        value = on.to_bytes(1, byteorder='big')
+        self.sock.sendto(value, (self.udp_destination, self.udp_port))
 
     def run(self):
         with self.keyboard.Listener(on_press=self._on_key_press, on_release=self._on_key_release) as listener:
@@ -63,6 +72,7 @@ class RemoteControlByKeyboard(RemoteControl):
         try:
             if key == self.keyboard.Key.space:  # Use alt as the control key
                 self._handle_control_event(True)
+                self._send_signal_over_udp(on=True)
         except AttributeError:
             pass
 
@@ -70,6 +80,8 @@ class RemoteControlByKeyboard(RemoteControl):
         try:
             if key == self.keyboard.Key.space:  # Use alt as the control key
                 self._handle_control_event(False)
+                self._send_signal_over_udp(on=False)
+
         except AttributeError:
             pass
 
@@ -81,9 +93,8 @@ class RemoteControlByUDP(RemoteControl):
     """
 
     def __init__(self, asr_choreographer: ASRChoreographer, udp_host: str = "0.0.0.0", udp_port: int = 5656, mode="toggle"):
-        super().__init__(asr_choreographer, mode)
+        super().__init__(asr_choreographer, mode, udp_port)
         self.udp_host = udp_host
-        self.udp_port = udp_port
 
     def run(self):
         self._listen_to_boolean_signal()

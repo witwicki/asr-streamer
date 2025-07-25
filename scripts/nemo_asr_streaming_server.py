@@ -73,7 +73,7 @@ def main(lookahead, decoder_type, decoding_strategy, tcp_server_port, rc_udp_hos
     # start remote control interface in another thread
     remote_control_interface : RemoteControl
     if keyboard:
-        remote_control_interface = RemoteControlByKeyboard(asr_choreographer, mode=control_mode)
+        remote_control_interface = RemoteControlByKeyboard(asr_choreographer, mode=control_mode, udp_port=rc_udp_port)
     else:
         remote_control_interface = RemoteControlByUDP(asr_choreographer, udp_host=rc_udp_host, udp_port=rc_udp_port, mode=control_mode)
     thread_remote = Thread(target=run_remote_control, args=(remote_control_interface,))
