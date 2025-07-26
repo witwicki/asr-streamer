@@ -51,7 +51,8 @@ class RemoteControlByKeyboard(RemoteControl):
     """
 
     def __init__(self, asr_choreographer: ASRChoreographer, mode="toggle", udp_port=5656):
-        super().__init__(asr_choreographer, mode, udp_port)
+        super().__init__(asr_choreographer, mode, udp_port+1) 
+        # hack: a bit of a magic number in order to conform to an external listener defaulting to 5657 = 5656+1
         from pynput import keyboard
         self.keyboard = keyboard
         # udp socket for sending events
