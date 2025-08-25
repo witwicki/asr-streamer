@@ -4,6 +4,7 @@ import os
 import importlib.resources
 import signal
 import time
+from deprecated import deprecated
 import numpy as np
 from threading import Event, Thread
 import wave
@@ -89,9 +90,14 @@ class ASRChoreographer:
         if self.asr_streamer.buffer:
             self.asr_streamer.reset_streaming_state()
 
-    def send_latest_asr_result(self):
+    @deprecated
+    def send_final_asr_result(self):
         print(f"SENDING LATEST RESULT: [{self.asr_streamer.buffer}]")
-        self.transcription_server.send_transcription(f"[{self.asr_streamer.buffer}]")
+        self.transcription_server.send_transcription_state(
+            transcription = self.asr_streamer.buffer,
+            user_activated = True,
+            final = True
+        )
 
     def recognize_speech(self, in_data, frame_count, time_info, status):
             start_time = time.time() # profile the runtime of this method, and track time in between results
@@ -117,6 +123,9 @@ class ASRChoreographer:
                 print("time since last asr_result: {:.2f}s, ".format(self.time_since_last_asr_result), end="")
                 print("effective detected silence: {:.2f}s".format(self.time_since_last_speech_activity_detected() - self.time_since_last_asr_result))
             # was no new speech detected?
+            complete_buffer = False
+            asr_result_changed = False
+            was_user_activated = self.is_active
             if text == self.asr_streamer.buffer:
                 # has enough silence passed that we should consider resetting asr?
                 if self.is_active:
@@ -124,18 +133,28 @@ class ASRChoreographer:
                         # in this case we are just looking for any late asr results followed by silence...
                         if self.deactivate_if_silence_threshold_exceeded(self.streaming_result_delay_silence_threshold):
                             if (self.active_finish_time - self.active_start_time) > self.MINIMUM_ACTIVE_DURATION:
-                                self.send_latest_asr_result()
+                                complete_buffer = True
                 else:
                     # ...whereas here we are looking for natural gaps in between utterances
                     #      that serve to seed our next active asr session with an appropriate beginning
                     if self.deactivate_if_silence_threshold_exceeded(self.silence_threshold):
                         # because asr is in passive mode, simply throw away the latest result
                         self.asr_streamer.buffer = ""
+                        complete_buffer = True
             else:
                 if not self.verbose: # otherwise we would have already printed it above
                     print(f"ASR_result: [{text}]") #, end='\r')
                 self.asr_streamer.buffer = text
                 self.update_last_activity()
+                asr_result_changed = True
+
+            if text and (asr_result_changed or complete_buffer):
+                self.transcription_server.send_transcription_state(
+                    transcription = text,
+                    user_activated = was_user_activated,
+                    final = complete_buffer
+                )
+
 
             return (in_data, self.pyaudio.paContinue)
 

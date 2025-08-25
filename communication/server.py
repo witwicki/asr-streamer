@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+import json
 
 class TranscriptionServer:
     """TranscriptionServer
@@ -49,6 +50,27 @@ class TranscriptionServer:
                 # Send as JSON string or another format
                 msg = ''.join(transcription).encode('utf-8')
                 self.client_socket.sendall(msg)
+                print(f'Sending over TCP: "{transcription}"')
+            except ConnectionResetError:
+                print("Client disconnected unexpectedly.")
+                self.close_connections()
+            except Exception as e:
+                print(f"Error sending transcription: {e}")
+
+    def send_transcription_state(self, transcription: str, user_activated: bool, final: bool):
+        """Send latest transcription result, whether or not user has marked this transcription as active,
+        and whether or not this is the final result before buffer is cleared.
+        """
+        # compose message
+        message = {}
+        message['transcription'] = transcription
+        message['user_activated'] = user_activated
+        message['final'] = final
+        encoded_message = json.dumps(message).encode('utf-8')
+        # send message
+        if self.client_socket:
+            try:
+                self.client_socket.sendall(encoded_message)
                 print(f'Sending over TCP: "{transcription}"')
             except ConnectionResetError:
                 print("Client disconnected unexpectedly.")
