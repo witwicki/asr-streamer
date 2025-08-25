@@ -142,11 +142,12 @@ class ASRChoreographer:
                         self.asr_streamer.buffer = ""
                         complete_buffer = True
             else:
-                if not self.verbose: # otherwise we would have already printed it above
-                    print(f"ASR_result: [{text}]") #, end='\r')
                 self.asr_streamer.buffer = text
                 self.update_last_activity()
                 asr_result_changed = True
+
+            if text and not self.verbose: # otherwise we would have already printed it above
+                print(f"ASR_result: [{text}]", end=('\n\n' if complete_buffer else '\r'))
 
             if text and (asr_result_changed or complete_buffer):
                 self.transcription_server.send_transcription_state(

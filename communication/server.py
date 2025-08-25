@@ -31,6 +31,8 @@ class TranscriptionServer:
 
     def accept_client(self):
         """Accept client connection or reconnection"""
+        if self.client_socket is None:
+            print("Waiting for a TCP listener to connect...")
         while not self.connections_closed:
             try:
                 if self.server_socket:
@@ -39,8 +41,6 @@ class TranscriptionServer:
             except BlockingIOError:
                 pass
             finally:
-                if self.client_socket is None:
-                    print("...waiting for a TCP listener to connect...")
                 time.sleep(1.0)
 
     def send_transcription(self, transcription):
@@ -71,7 +71,6 @@ class TranscriptionServer:
         if self.client_socket:
             try:
                 self.client_socket.sendall(encoded_message)
-                print(f'Sending over TCP: "{transcription}"')
             except ConnectionResetError:
                 print("Client disconnected unexpectedly.")
                 self.close_connections()
