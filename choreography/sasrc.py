@@ -8,6 +8,7 @@ import numpy as np
 from threading import Event, Thread
 import wave
 from streaming.asr import ASRStreamer
+from communication.server import TranscriptionServer
 
 class ASRChoreographer:
     """ Chroreograph the invocation of ASR and communication of speech recognition results
@@ -16,35 +17,50 @@ class ASRChoreographer:
     for managing user interaction.
 
     """
-    def __init__(self, asr_streamer, transcription_server, streaming_result_delay_silence_threshold=0.5, silence_threshold=1.0, exercise_output_channel=True, verbose=True):
-        self.asr_streamer = asr_streamer
-        self.transcription_server = transcription_server
-        self.streaming_result_delay_silence_threshold = streaming_result_delay_silence_threshold
-        self.silence_threshold = silence_threshold
-        self.exercise_output_channel = exercise_output_channel
-        self.waiting_for_silence_to_deactivate = False
+    
+    MINIMUM_ACTIVE_DURATION: float = 1.0 # seconds
+    
+    def __init__(
+        self, asr_streamer: ASRStreamer, 
+        transcription_server: TranscriptionServer, 
+        streaming_result_delay_silence_threshold: float = 0.5, 
+        silence_threshold: float = 1.0, 
+        exercise_output_channel: bool = True, 
+        verbose: bool = True
+    ) -> None:
+        self.asr_streamer: ASRStreamer = asr_streamer
+        self.transcription_server: TranscriptionServer = transcription_server
+        self.streaming_result_delay_silence_threshold: float = streaming_result_delay_silence_threshold
+        self.silence_threshold: float = silence_threshold
+        self.exercise_output_channel: bool = exercise_output_channel
+        self.waiting_for_silence_to_deactivate: bool = False
         current_time = time.time()
-        self.last_activity_time = current_time
-        self.time_of_last_asr_result = current_time
-        self.time_consumed_by_asr_processing = None
-        self.time_since_last_asr_result = 0.0
-        self.is_active = False # active vs. passive (where ASR is still processing, just not sending the results)
-        self.verbose = verbose
-        self.init_time = time.time()
-        self.active_start_time = 0.0
-        self.active_finish_time = 0.0
-        self.MINIMUM_ACTIVE_DURATION = 1.0 # seconds
+        self.last_activity_time: float = current_time
+        self.time_of_last_asr_result: float = current_time
+        self.time_consumed_by_asr_processing: float|None = None
+        self.time_since_last_asr_result: float = 0.0
+        self.is_active: bool = False # active vs. passive (where ASR is still processing, just not sending the results)
+        self.verbose: bool = verbose
+        self.init_time: float = time.time()
+        self.active_start_time: float = 0.0
+        self.active_finish_time: float = 0.0
 
         # project path is one level up from this file
-        self.project_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        self.project_path:str = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
         # handling of Ctrl-C
-        self._exit_event = Event()
-        signal.signal(signal.SIGINT, self._force_exit_handler)
+        self._exit_event: Event = Event()
+        _ = signal.signal(signal.SIGINT, self._force_exit_handler)
 
         # state variables
         self.was_killed = False
         self.frames_processed = 0
+        
+        # pyaudio variables (including background noise to keep pulseaudio sink awake)
+        self.pyaudio = None
+        self._pyaudio = None
+        self._background_noise_thread: Thread|None = None
+        
 
     def setup_audio_output(self, pyaudio_package, pyaudio_object):
         self.pyaudio = pyaudio_package
@@ -123,7 +139,7 @@ class ASRChoreographer:
                     if self.waiting_for_silence_to_deactivate:
                         # in this case we are just looking for any late asr results followed by silence...
                         if self.deactivate_if_silence_threshold_exceeded(self.streaming_result_delay_silence_threshold):
-                            if (self.active_finish_time - self.active_start_time) > self.MINIMUM_ACTIVE_DURATION:
+                            if (self.active_finish_time - self.active_start_time) > ASRChoreographer.MINIMUM_ACTIVE_DURATION:
                                 self.send_latest_asr_result()
                 else:
                     # ...whereas here we are looking for natural gaps in between utterances
@@ -160,7 +176,7 @@ class ASRChoreographer:
         """Update the last activity timestamp when speech is detected."""
         self.last_activity_time = time.time()
 
-    def _force_exit_handler(self, sig, frame):
+    def _force_exit_handler(self, sig, frame) -> None:
         print("\nCtrl-C pressed!")
         self._exit_event.set()
         self.transcription_server.close_connections()
