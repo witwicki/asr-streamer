@@ -20,6 +20,9 @@ dependencies = [
     "torchaudio",
     "wheel",
     "pynput>=1.8.1",
+    "typing_extensions",
+    "basedpyright>=1.34.0",
+    "nodejs-wheel-binaries>=24.11.1",
 ]
 
 [tool.uv.sources]
