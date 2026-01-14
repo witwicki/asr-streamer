@@ -3,8 +3,8 @@ from __future__ import annotations
 import socket
 import threading
 import time
-from threading import Thread
 from typing import cast
+import json
 
 class TranscriptionServer:
     """TranscriptionServer
@@ -35,6 +35,8 @@ class TranscriptionServer:
 
     def accept_client(self) -> None:
         """Accept client connection or reconnection"""
+        if self.client_socket is None:
+            print("Waiting for a TCP listener to connect...")
         while not self.connections_closed:
             try:
                 if self.server_socket:
@@ -48,8 +50,6 @@ class TranscriptionServer:
             except BlockingIOError:
                 pass
             finally:
-                if self.client_socket is None:
-                    print("...waiting for a TCP listener to connect...")
                 time.sleep(1.0)
 
     def send_transcription(self, transcription: str) -> None:
@@ -66,7 +66,27 @@ class TranscriptionServer:
             except Exception as exc:  # pragma: no cover - defensive
                 print(f"Error sending transcription: {exc}")
 
-    def close_connections(self) -> None:
+    def send_transcription_state(self, transcription: str, user_activated: bool, final: bool):
+        """Send latest transcription result, whether or not user has marked this transcription as active,
+        and whether or not this is the final result before buffer is cleared.
+        """
+        # compose message
+        message = {}
+        message['transcription'] = transcription
+        message['user_activated'] = user_activated
+        message['final'] = final
+        encoded_message = json.dumps(message).encode('utf-8')
+        # send message
+        if self.client_socket:
+            try:
+                self.client_socket.sendall(encoded_message)
+            except ConnectionResetError:
+                print("Client disconnected unexpectedly.")
+                self.close_connections()
+            except Exception as e:
+                print(f"Error sending transcription: {e}")
+
+    def close_connections(self):
         """Close TCP connections."""
         print("Closing TCP connections...")
         if self.client_socket:
