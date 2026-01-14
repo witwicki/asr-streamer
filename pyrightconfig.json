@@ -1,0 +1,4 @@
+{
+  "typeCheckingMode": "recommended",
+  "ignore": ["**/__pycache__", "**/.venv"]
+}
