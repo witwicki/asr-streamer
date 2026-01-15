@@ -7,7 +7,7 @@
 Key features:
 
 - Invocation of _streaming_ inference models for automated speech recognition, starting with [NVIDIA's Fast-Conformer Model](https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi)
-- Publishing of recognized speech over TCP
+- Publishing of recognized speech over TCP to multiple ports simultaneously
 - Press-to-talk UI by remote control, so the user can decide when to speech transcriptions are recorded and published
 
 ## Prerequisites

@@ -22,7 +22,7 @@ def run_remote_control(remote_control: RemoteControl) -> None:
 
 
 @click.command()
-@click.option('--tcp_server_port', default=27400, help='The port over which to serve TCP messages, e.g., 27400')
+@click.option('--tcp_server_port', multiple=True, type=int, default=[27400, 27401], help='The port(s) over which to serve TCP messages, e.g., 27400. Can be specified multiple times.')
 @click.option('--lookahead', type=click.Choice(['0', '80', '480', '1040']), default='80', help='Lookahead size for streaming ASR in ms')
 @click.option('--decoder_type', type=click.Choice(['rnnt']), default='rnnt') #, 'ctc'])
 @click.option('--decoding_strategy', type=click.Choice(['greedy', 'beam']), default='greedy')
@@ -37,7 +37,7 @@ def main(
     decoder_type: str,
     decoding_strategy: str,
     silence_threshold: float,
-    tcp_server_port: int,
+    tcp_server_port: tuple[int, ...],
     rc_udp_host: str,
     rc_udp_port: int,
     toggle_button_control: bool,
@@ -81,7 +81,7 @@ def main(
     thread_stream.start()
 
     # Start transcription server, which takes care of its own threading
-    server.start_server(port=tcp_server_port)
+    server.start_server(ports=list(tcp_server_port))
 
     # start remote control interface in another thread
     remote_control_interface: RemoteControl
